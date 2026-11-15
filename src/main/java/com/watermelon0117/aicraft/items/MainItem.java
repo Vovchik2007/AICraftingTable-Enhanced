@@ -51,7 +51,22 @@ public class MainItem extends Item {
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
-        return super.use(level, player, hand);
+        ItemStack stack = player.getItemInHand(hand);
+        CompoundTag data = stack.getOrCreateTag().getCompound("aicraft");
+        if (!"throw_projectile".equals(data.getString("behavior"))) {
+            return super.use(level, player, hand);
+        }
+        if (!level.isClientSide) {
+            net.minecraft.world.entity.projectile.Snowball projectile =
+                    new net.minecraft.world.entity.projectile.Snowball(level, player);
+            projectile.setItem(stack.copyWithCount(1));
+            projectile.shootFromRotation(player, player.getXRot(), player.getYRot(), -20.0F, 1.5F, 1.0F);
+            level.addFreshEntity(projectile);
+            level.playSound(null, player.getX(), player.getY(), player.getZ(),
+                    SoundEvents.SNOWBALL_THROW, SoundSource.NEUTRAL, 0.5F, 0.8F / (level.getRandom().nextFloat() * 0.4F + 0.8F));
+        }
+        player.getCooldowns().addCooldown(this, 12);
+        return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
     }
     public InteractionResult useOn(UseOnContext context) {
         CompoundTag tag = context.getItemInHand().getOrCreateTag().getCompound("aicraft");
