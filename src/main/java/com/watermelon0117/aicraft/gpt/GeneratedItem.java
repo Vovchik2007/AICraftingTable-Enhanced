@@ -49,6 +49,12 @@ public record GeneratedItem(ItemStack itemStack, byte[] rawTexture, boolean shap
             tag.putString("behavior", behavior);
             String effect = json.projectile_effect == null ? "none" : json.projectile_effect.trim().toLowerCase(java.util.Locale.ROOT);
             if (java.util.Set.of("none", "cloud", "flame", "sparkle").contains(effect)) tag.putString("projectileEffect", effect);
+        } else if (behavior.equals("spawn_entity")) {
+            String entityType = json.entity_type == null ? "none" : json.entity_type.trim().toLowerCase(java.util.Locale.ROOT);
+            if (java.util.Set.of("pig", "cow", "sheep", "chicken", "wolf", "cat", "horse", "rabbit", "fox", "bee", "allay", "iron_golem", "snow_golem", "villager").contains(entityType)) {
+                tag.putString("behavior", behavior);
+                tag.putString("entityType", entityType);
+            }
         }
 
         putBooleanIfTrue(tag, "isPickaxe", json.is_suitable_for_breaking_stone);
