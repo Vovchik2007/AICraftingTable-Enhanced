@@ -81,6 +81,7 @@ public class MainItem extends Item {
                                 player.getZ() + player.getLookAngle().z * 1.5,
                                 player.getYRot(), 0.0F);
                         level.addFreshEntity(entity);
+                        if (!player.getAbilities().instabuild) stack.shrink(1);
                     }
                 }
             }
@@ -96,6 +97,7 @@ public class MainItem extends Item {
             projectile.setItem(stack.copyWithCount(1));
             projectile.shootFromRotation(player, player.getXRot(), player.getYRot(), -20.0F, 1.5F, 1.0F);
             level.addFreshEntity(projectile);
+            if (!player.getAbilities().instabuild) stack.shrink(1);
             level.playSound(null, player.getX(), player.getY(), player.getZ(),
                     SoundEvents.SNOWBALL_THROW, SoundSource.NEUTRAL, 0.5F, 0.8F / (level.getRandom().nextFloat() * 0.4F + 0.8F));
         }
