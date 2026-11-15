@@ -1,0 +1,47 @@
+name: Import upstream source
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/import-upstream.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out enhanced repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Check out original project
+        uses: actions/checkout@v4
+        with:
+          repository: AlexLee1235/AICraftingTable
+          ref: dev
+          path: upstream
+          persist-credentials: false
+
+      - name: Import original source and resources
+        shell: bash
+        run: |
+          rsync -a --exclude='.git' --exclude='README.md' upstream/ ./
+          git status --short
+
+      - name: Commit imported files
+        shell: bash
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "Import original AI Crafting Table source"
+            git push origin HEAD:main
+          else
+            echo "No source changes to import."
+          fi
