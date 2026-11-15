@@ -22,7 +22,16 @@ public final class GeneratedProjectileEvents {
         if (!(snowball.level() instanceof ServerLevel level)) return;
         var pos = snowball.position();
         switch (data.getString("projectileEffect")) {
-            case "cloud" -> level.sendParticles(ParticleTypes.CLOUD, pos.x, pos.y, pos.z, 28, 0.45, 0.35, 0.45, 0.03);
+            case "cloud" -> {
+                net.minecraft.world.entity.AreaEffectCloud cloud =
+                        new net.minecraft.world.entity.AreaEffectCloud(level, pos.x, pos.y, pos.z);
+                cloud.setRadius(2.0F);
+                cloud.setDuration(80);
+                cloud.setWaitTime(0);
+                cloud.setRadiusPerTick(-0.025F);
+                cloud.setParticle(ParticleTypes.CLOUD);
+                level.addFreshEntity(cloud);
+            }
             case "flame" -> level.sendParticles(ParticleTypes.FLAME, pos.x, pos.y, pos.z, 20, 0.35, 0.25, 0.35, 0.02);
             case "sparkle" -> level.sendParticles(ParticleTypes.END_ROD, pos.x, pos.y, pos.z, 18, 0.35, 0.35, 0.35, 0.03);
             default -> { }
