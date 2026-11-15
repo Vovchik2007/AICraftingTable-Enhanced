@@ -22,7 +22,9 @@ public class GPTItemGenerator {
             "attack_speed(slow, normal, fast)?\n" +
             "is_edible?\n" +
             "nutrition_value(0 to 20, apple is 4 for reference)?\n" +
-            "food_is_solid_or_liquid?\n";
+            "food_is_solid_or_liquid?\n" +
+            "behavior(none, throw_projectile)?\n" +
+            "projectile_effect(none, cloud, flame, sparkle; only used with throw_projectile)?\n";
     private final OpenAIChatClient client = new OpenAIChatClient("gpt-4.1", 1.0, 1024, "", "json_object");
     private final Gson gson = new GsonBuilder().setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES).create();
     private final GPTImageGenerator imgClient = new GPTImageGenerator();
