@@ -43,6 +43,13 @@ public record GeneratedItem(ItemStack itemStack, byte[] rawTexture, boolean shap
         CompoundTag tag = new CompoundTag();
         tag.putString("id", id);
         tag.putString("name", name);
+        // Runtime behavior is restricted to a small, server-validated allow-list.
+        String behavior = json.behavior == null ? "none" : json.behavior.trim().toLowerCase(java.util.Locale.ROOT);
+        if (behavior.equals("throw_projectile")) {
+            tag.putString("behavior", behavior);
+            String effect = json.projectile_effect == null ? "none" : json.projectile_effect.trim().toLowerCase(java.util.Locale.ROOT);
+            if (java.util.Set.of("none", "cloud", "flame", "sparkle").contains(effect)) tag.putString("projectileEffect", effect);
+        }
 
         putBooleanIfTrue(tag, "isPickaxe", json.is_suitable_for_breaking_stone);
         putBooleanIfTrue(tag, "isAxe", json.is_suitable_for_breaking_woods);
