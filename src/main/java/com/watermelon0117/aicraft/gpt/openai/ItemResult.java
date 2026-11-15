@@ -4,6 +4,7 @@ public class ItemResult  {
     // Safe, allow-listed behavior descriptor. Never contains executable code.
     public String behavior;
     public String projectile_effect;
+    public String entity_type;
 
     public String visual_description;
     public boolean is_shapeless_crafting;
