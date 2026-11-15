@@ -53,7 +53,41 @@ public class MainItem extends Item {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
         CompoundTag data = stack.getOrCreateTag().getCompound("aicraft");
-        if (!"throw_projectile".equals(data.getString("behavior"))) {
+        String behavior = data.getString("behavior");
+        if ("spawn_entity".equals(behavior)) {
+            if (!level.isClientSide) {
+                net.minecraft.world.entity.EntityType<?> type = switch (data.getString("entityType")) {
+                    case "pig" -> net.minecraft.world.entity.EntityType.PIG;
+                    case "cow" -> net.minecraft.world.entity.EntityType.COW;
+                    case "sheep" -> net.minecraft.world.entity.EntityType.SHEEP;
+                    case "chicken" -> net.minecraft.world.entity.EntityType.CHICKEN;
+                    case "wolf" -> net.minecraft.world.entity.EntityType.WOLF;
+                    case "cat" -> net.minecraft.world.entity.EntityType.CAT;
+                    case "horse" -> net.minecraft.world.entity.EntityType.HORSE;
+                    case "rabbit" -> net.minecraft.world.entity.EntityType.RABBIT;
+                    case "fox" -> net.minecraft.world.entity.EntityType.FOX;
+                    case "bee" -> net.minecraft.world.entity.EntityType.BEE;
+                    case "allay" -> net.minecraft.world.entity.EntityType.ALLAY;
+                    case "iron_golem" -> net.minecraft.world.entity.EntityType.IRON_GOLEM;
+                    case "snow_golem" -> net.minecraft.world.entity.EntityType.SNOW_GOLEM;
+                    case "villager" -> net.minecraft.world.entity.EntityType.VILLAGER;
+                    default -> null;
+                };
+                if (type != null) {
+                    net.minecraft.world.entity.Entity entity = type.create(level);
+                    if (entity != null) {
+                        entity.moveTo(player.getX() + player.getLookAngle().x * 1.5,
+                                player.getY() + 0.2,
+                                player.getZ() + player.getLookAngle().z * 1.5,
+                                player.getYRot(), 0.0F);
+                        level.addFreshEntity(entity);
+                    }
+                }
+            }
+            player.getCooldowns().addCooldown(this, 20);
+            return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
+        }
+        if (!"throw_projectile".equals(behavior)) {
             return super.use(level, player, hand);
         }
         if (!level.isClientSide) {
