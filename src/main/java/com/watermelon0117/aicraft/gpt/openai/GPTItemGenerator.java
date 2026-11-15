@@ -23,8 +23,10 @@ public class GPTItemGenerator {
             "is_edible?\n" +
             "nutrition_value(0 to 20, apple is 4 for reference)?\n" +
             "food_is_solid_or_liquid?\n" +
-            "behavior(none, throw_projectile)?\n" +
-            "projectile_effect(none, cloud, flame, sparkle; only used with throw_projectile)?\n";
+            "behavior(none, throw_projectile, spawn_entity)?\n" +
+            "projectile_effect(none, cloud, flame, sparkle; only used with throw_projectile)?\n" +
+            "entity_type(none, pig, cow, sheep, chicken, wolf, cat, horse, rabbit, fox, bee, allay, iron_golem, snow_golem, villager; only used with spawn_entity)?\n" +
+            "Choose spawn_entity for a spawn egg or creature-summoning item using one listed entity. Choose throw_projectile for a throwable item or projectile launcher. Otherwise choose none. Never invent entity types outside this list.\n";
     private final OpenAIChatClient client = new OpenAIChatClient("gpt-4.1", 1.0, 1024, "", "json_object");
     private final Gson gson = new GsonBuilder().setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES).create();
     private final GPTImageGenerator imgClient = new GPTImageGenerator();
