@@ -1,0 +1,313 @@
+package com.watermelon0117.aicraft.client.screen;
+
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.watermelon0117.aicraft.common.SpecialItemManager;
+import com.watermelon0117.aicraft.items.AIBlockItem;
+import com.watermelon0117.aicraft.items.MainItem;
+import com.watermelon0117.aicraft.menu.AICraftingTableMenu;
+import com.watermelon0117.aicraft.network.PacketHandler;
+import com.watermelon0117.aicraft.network.SPlaceRecipePacket;
+import com.watermelon0117.aicraft.common.RecipeManager;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.RecipeBookCategories;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Renderable;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.narration.NarratableEntry;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.recipebook.RecipeBookTabButton;
+import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
+import org.lwjgl.glfw.GLFW;
+
+import javax.annotation.Nullable;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+
+public class CustomRecipeBookComponent implements Renderable, GuiEventListener, NarratableEntry {
+    protected static final ResourceLocation RECIPE_BOOK_LOCATION = new ResourceLocation("textures/gui/recipe_book.png");
+    private static final Component SEARCH_HINT = Component.translatable("gui.recipebook.search_hint").withStyle(ChatFormatting.ITALIC).withStyle(ChatFormatting.GRAY);
+    public static final int IMAGE_WIDTH = 147;
+    public static final int IMAGE_HEIGHT = 166;
+    private static final int OFFSET_X_POSITION = 86;
+    private static final Component ONLY_CRAFTABLES_TOOLTIP = Component.translatable("gui.recipebook.toggleRecipes.craftable");
+    private static final Component ALL_RECIPES_TOOLTIP = Component.translatable("gui.recipebook.toggleRecipes.all");
+    private int xOffset;
+    private int width;
+    private int height;
+    Minecraft minecraft;
+    private AICraftingTableMenu menu;
+    protected final CustomGhostRecipe ghostRecipe = new CustomGhostRecipe();
+    private final CustomRecipeBookPage recipeBookPage = new CustomRecipeBookPage();
+    private final List<RecipeBookTabButton> tabButtons = RecipeBookCategories.CRAFTING_CATEGORIES.stream().map(RecipeBookTabButton::new).toList();
+    private RecipeBookTabButton selectedTab = this.tabButtons.get(0);
+    private EditBox searchBox;
+    private String lastSearch = "";
+    /** Every AI item as last synced, newest first. */
+    private List<ItemStack> items = List.of();
+    private boolean ignoreTextInput;
+    public boolean visible;
+    private boolean focused;
+    int times=0;
+
+    public CustomRecipeBookComponent() {
+        this.selectedTab.setStateTriggered(true);
+    }
+
+    public void init(int p_100310_, int p_100311_, Minecraft p_100312_, AICraftingTableMenu menu) {
+        this.xOffset = 86;
+        this.minecraft=p_100312_;
+        this.menu=menu;
+        this.width = p_100310_;
+        this.height = p_100311_;
+        int i = (this.width - 147) / 2 - this.xOffset;
+        int j = (this.height - 166) / 2;
+        String search = this.searchBox != null ? this.searchBox.getValue() : "";
+        this.searchBox = new EditBox(this.minecraft.font, i + 26, j + 14, 79, this.minecraft.font.lineHeight + 3, Component.translatable("itemGroup.search"));
+        this.searchBox.setMaxLength(50);
+        this.searchBox.setVisible(true);
+        this.searchBox.setTextColor(16777215);
+        this.searchBox.setValue(search);
+        this.searchBox.setHint(SEARCH_HINT);
+        this.recipeBookPage.init(this.minecraft, i, j, menu);
+        this.itemsUpdated();
+    }
+
+    /** Takes the AI items as last synced, which can fill an empty tab or empty the one that is open. */
+    public void itemsUpdated() {
+        this.items = SpecialItemManager.ClientSide.list();
+        this.updateTabs();
+        this.updateShownItems(false);
+    }
+
+    private static RecipeBookCategories categoryOf(ItemStack stack) {
+        if (stack.getItem() instanceof AIBlockItem) {
+            return RecipeBookCategories.CRAFTING_BUILDING_BLOCKS;
+        }
+        return MainItem.isToolMelee(stack) ? RecipeBookCategories.CRAFTING_EQUIPMENT : RecipeBookCategories.CRAFTING_MISC;
+    }
+
+    private void updateTabs() {
+        int i = (this.width - 147) / 2 - this.xOffset - 30;
+        int j = (this.height - 166) / 2 + 3;
+        int shown = 0;
+        for (RecipeBookTabButton tab : this.tabButtons) {
+            RecipeBookCategories category = tab.getCategory();
+            tab.visible = category == RecipeBookCategories.CRAFTING_SEARCH || this.items.stream().anyMatch(stack -> categoryOf(stack) == category);
+            if (tab.visible) {
+                tab.setPosition(i, j + 27 * shown++);
+            }
+        }
+        if (!this.selectedTab.visible) {
+            this.selectTab(this.tabButtons.get(0));
+        }
+    }
+
+    private void selectTab(RecipeBookTabButton tab) {
+        this.selectedTab.setStateTriggered(false);
+        this.selectedTab = tab;
+        this.selectedTab.setStateTriggered(true);
+    }
+
+    private void updateShownItems(boolean resetPage) {
+        RecipeBookCategories category = this.selectedTab.getCategory();
+        String search = this.searchBox.getValue().toLowerCase(Locale.ROOT);
+        this.recipeBookPage.updateItems(this.items.stream()
+                .filter(stack -> category == RecipeBookCategories.CRAFTING_SEARCH || categoryOf(stack) == category)
+                .filter(stack -> stack.getHoverName().getString().toLowerCase(Locale.ROOT).contains(search))
+                .toList(), resetPage);
+    }
+
+    public void tick() {
+        if (this.visible) {
+            this.searchBox.tick();
+        }
+    }
+
+    public void slotClicked(@Nullable Slot p_100315_) {
+        if (p_100315_ != null && p_100315_.index < 10) {
+            this.ghostRecipe.clear();
+        }
+    }
+    public void render(GuiGraphics p_100319_, int p_100320_, int p_100321_, float p_100322_) {
+        if (this.visible) {
+            p_100319_.pose().pushPose();
+            p_100319_.pose().translate(0.0D, 0.0D, 100.0D);
+            RenderSystem.setShader(GameRenderer::getPositionTexShader);
+            RenderSystem.setShaderTexture(0, RECIPE_BOOK_LOCATION);
+            RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+            int i = (this.width - 147) / 2 - this.xOffset;
+            int j = (this.height - 166) / 2;
+            p_100319_.blit(RECIPE_BOOK_LOCATION, i, j, 1, 1, 147, 166);
+            this.searchBox.render(p_100319_, p_100320_, p_100321_, p_100322_);
+
+            for (RecipeBookTabButton tab : this.tabButtons) {
+                tab.render(p_100319_, p_100320_, p_100321_, p_100322_);
+            }
+
+            this.recipeBookPage.render(p_100319_, i, j, p_100320_, p_100321_, p_100322_);
+            p_100319_.pose().popPose();
+        }
+    }
+    public void renderGhostRecipe(GuiGraphics p_100323_, int p_100324_, int p_100325_, boolean p_100326_, float p_100327_) {
+        this.ghostRecipe.render(p_100323_, this.minecraft, p_100324_, p_100325_, false, p_100327_);
+    }
+    public void renderTooltip(GuiGraphics p_100362_, int p_100363_, int p_100364_, int p_100365_, int p_100366_) {
+        if (this.visible) {
+            this.recipeBookPage.renderTooltip(p_100362_, p_100365_, p_100366_);
+        }
+        this.renderGhostRecipeTooltip(p_100362_, p_100363_, p_100364_, p_100365_, p_100366_);
+    }
+    private void renderGhostRecipeTooltip(GuiGraphics p_100375_, int p_100376_, int p_100377_, int p_100378_, int p_100379_) {
+        if (this.ghostRecipe.itemStacks == null) return;
+        ItemStack itemstack = null;
+        for (int i = 0; i < 9; ++i) {
+            ItemStack stack = this.ghostRecipe.itemStacks[i];
+            int j = i % 3 * 18 + 9 + p_100376_;
+            int k = i / 3 * 18 + 17 + p_100377_;
+            if (p_100378_ >= j && p_100379_ >= k && p_100378_ < j + 16 && p_100379_ < k + 16) {
+                itemstack = stack;
+            }
+        }
+        if (itemstack != null && !itemstack.isEmpty() && this.minecraft.screen != null) {
+            p_100375_.renderComponentTooltip(this.minecraft.font, Screen.getTooltipFromItem(this.minecraft, itemstack), p_100378_, p_100379_, itemstack);
+        }
+    }
+    public boolean mouseClicked(double p_100294_, double p_100295_, int p_100296_) {
+        if (this.visible && !this.minecraft.player.isSpectator()) {
+            if (this.recipeBookPage.mouseClicked(p_100294_, p_100295_, p_100296_, (this.width - 147) / 2 - this.xOffset, (this.height - 166) / 2, 147, 166)) {
+                ItemStack itemStack = this.recipeBookPage.getLastClickedRecipe();
+                if (itemStack != null && !itemStack.isEmpty()) {
+                    this.ghostRecipe.clear();
+                    var recipes = RecipeManager.get().getRecipesForItem(itemStack);
+                    if (recipes.isEmpty())
+                        return true;
+                    PacketHandler.sendToServer(new SPlaceRecipePacket(this.menu.blockEntity.getBlockPos(),
+                            recipes.get((times++) % recipes.size()), Screen.hasShiftDown()));
+                }
+                return true;
+            }
+            if (this.searchBox.mouseClicked(p_100294_, p_100295_, p_100296_)) {
+                this.searchBox.setFocused(true);
+                return true;
+            }
+            this.searchBox.setFocused(false);
+            for (RecipeBookTabButton tab : this.tabButtons) {
+                if (tab.mouseClicked(p_100294_, p_100295_, p_100296_)) {
+                    if (this.selectedTab != tab) {
+                        this.selectTab(tab);
+                        this.updateShownItems(true);
+                    }
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        this.ignoreTextInput = false;
+        if (this.visible && !this.minecraft.player.isSpectator()) {
+            if (this.searchBox.keyPressed(keyCode, scanCode, modifiers)) {
+                this.checkSearchStringUpdate();
+                return true;
+            }
+            // Keeps the inventory, hotbar and drop keys from acting while they are being typed.
+            if (this.searchBox.isFocused() && keyCode != GLFW.GLFW_KEY_ESCAPE) {
+                return true;
+            }
+            if (this.minecraft.options.keyChat.matches(keyCode, scanCode) && !this.searchBox.isFocused()) {
+                this.ignoreTextInput = true;
+                this.searchBox.setFocused(true);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
+        this.ignoreTextInput = false;
+        return GuiEventListener.super.keyReleased(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public boolean charTyped(char character, int modifiers) {
+        if (this.ignoreTextInput || !this.visible || this.minecraft.player.isSpectator()) {
+            return false;
+        }
+        if (this.searchBox.charTyped(character, modifiers)) {
+            this.checkSearchStringUpdate();
+            return true;
+        }
+        return false;
+    }
+
+    private void checkSearchStringUpdate() {
+        String search = this.searchBox.getValue().toLowerCase(Locale.ROOT);
+        if (!search.equals(this.lastSearch)) {
+            this.updateShownItems(false);
+            this.lastSearch = search;
+        }
+    }
+
+
+    public boolean hasClickedOutside(double p_100298_, double p_100299_, int p_100300_, int p_100301_, int p_100302_, int p_100303_, int p_100304_) {
+        if (!this.visible) {
+            return true;
+        } else {
+            boolean flag = p_100298_ < (double)p_100300_ || p_100299_ < (double)p_100301_ || p_100298_ >= (double)(p_100300_ + p_100302_) || p_100299_ >= (double)(p_100301_ + p_100303_);
+            boolean flag1 = (double)(p_100300_ - 147) < p_100298_ && p_100298_ < (double)p_100300_ && (double)p_100301_ < p_100299_ && p_100299_ < (double)(p_100301_ + p_100303_);
+            return flag && !flag1 && !this.selectedTab.isHoveredOrFocused();
+        }
+    }
+    public void setupGhostRecipe(ItemStack[] recipe) {
+        this.ghostRecipe.setRecipe(recipe);
+    }
+    public void toggleVisibility() {
+        this.visible = !this.visible;
+    }
+    public int updateScreenPosition(int p_181402_, int p_181403_) {
+        int i;
+        if (this.visible) {
+            i = 177 + (p_181402_ - p_181403_ - 200) / 2;
+        } else {
+            i = (p_181402_ - p_181403_) / 2;
+        }
+
+        return i;
+    }
+
+    public NarratableEntry.NarrationPriority narrationPriority() {
+        return NarratableEntry.NarrationPriority.NONE;
+    }
+    public void updateNarration(NarrationElementOutput p_170046_) {}
+
+    @Override
+    public void setFocused(boolean focused) {
+        this.focused = focused;
+    }
+
+    @Override
+    public boolean isFocused() {
+        return this.focused;
+    }
+
+    @Override
+    public boolean isMouseOver(double mouseX, double mouseY) {
+        if (!this.visible) {
+            return false;
+        }
+        int i = (this.width - 147) / 2 - this.xOffset;
+        int j = (this.height - 166) / 2;
+        return mouseX >= i && mouseY >= j && mouseX < i + IMAGE_WIDTH && mouseY < j + IMAGE_HEIGHT;
+    }
+}
